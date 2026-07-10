@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JAAS Dashboard — Credentials & Service status (mock)</title>
+<style>
+  /* ===== Canonical Vanilla-inspired, self-contained (no CDN) ===== */
+  :root {
+    --orange:#e95420; --orange-d:#c7431a;
+    --ink:#111; --text:#1a1a1a; --muted:#6b6b6b; --faint:#8a8a8a;
+    --link:#0066cc;
+    --line:#e0e0e0; --line-2:#cdcdcd;
+    --bg:#f2f2f2; --panel:#fff; --panel-2:#fafafa;
+    --pos:#0e8420; --pos-bg:#f0f7ee;
+    --cau:#f99b11; --cau-ink:#8a5a00; --cau-bg:#fdf6e8;
+    --neg:#c7162b; --neg-bg:#fcecee;
+    --info:#2a7de1; --info-bg:#eaf2fc;
+    --nav:#262626; --nav-2:#2f2f2f; --nav-a:#0f0f0f;
+    --r:4px; --r-lg:8px;
+    --sh:0 1px 2px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.08);
+    --sh-lg:0 6px 24px rgba(0,0,0,.16);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:Ubuntu,"Segoe UI",Roboto,-apple-system,Arial,sans-serif;color:var(--text);background:var(--bg);line-height:1.5;-webkit-font-smoothing:antialiased;}
+  a{color:var(--link);text-decoration:none;cursor:pointer;}
+  a:hover{text-decoration:underline;}
+  .mono{font-family:"Ubuntu Mono","SF Mono",Consolas,monospace;}
+
+  /* ===== Masthead ===== */
+  .masthead{background:var(--nav-a);color:#fff;height:52px;display:flex;align-items:center;padding:0 1.25rem;gap:1rem;position:sticky;top:0;z-index:15;}
+  .masthead .logo{display:flex;align-items:center;gap:.55rem;font-weight:300;font-size:1.05rem;letter-spacing:.02em;}
+  .masthead .logo .tag{background:var(--orange);color:#fff;font-weight:500;padding:2px 7px;border-radius:2px;font-size:.72rem;letter-spacing:.03em;}
+  .masthead .spacer{flex:1;}
+  .health-chip{display:inline-flex;align-items:center;gap:.5rem;padding:.3rem .7rem;border-radius:20px;font-size:.8rem;font-weight:500;background:#1f1f1f;border:1px solid #383838;}
+  .masthead .user{display:flex;align-items:center;gap:.55rem;font-size:.85rem;color:#e0e0e0;}
+  .masthead .avatar{width:30px;height:30px;border-radius:50%;background:var(--orange);display:grid;place-items:center;font-size:.82rem;font-weight:600;color:#fff;}
+
+  /* ===== Layout ===== */
+  .app{display:flex;min-height:calc(100vh - 52px);}
+  nav.primary{width:240px;background:var(--nav);color:#cfcfcf;padding:.75rem 0;flex-shrink:0;position:sticky;top:52px;height:calc(100vh - 52px);}
+  nav.primary .navlink{display:flex;align-items:center;gap:.7rem;padding:.6rem 1.1rem;color:#cfcfcf;cursor:pointer;font-size:.9rem;border:none;background:none;width:100%;text-align:left;transition:background .12s;}
+  nav.primary .navlink:hover{background:var(--nav-2);text-decoration:none;color:#fff;}
+  nav.primary .navlink.active{background:#000;color:#fff;box-shadow:inset 3px 0 0 var(--orange);}
+  nav.primary .navlink .ico{width:20px;text-align:center;opacity:.9;font-size:1rem;}
+  nav.primary .navlink .badge{margin-left:auto;}
+  nav.primary .section-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:#7d7d7d;padding:1rem 1.1rem .3rem;}
+
+  main{flex:1;padding:1.75rem 2.25rem 5rem;max-width:1120px;}
+  h1{font-weight:300;font-size:1.9rem;margin:0 0 .2rem;letter-spacing:-.01em;}
+  h2{font-weight:400;font-size:1.15rem;margin:1.75rem 0 .6rem;}
+  h3{font-weight:500;font-size:.95rem;margin:1.1rem 0 .4rem;text-transform:uppercase;letter-spacing:.04em;color:#555;}
+  .subtitle{color:var(--muted);margin:0 0 1.25rem;font-size:.95rem;}
+  .breadcrumb{font-size:.8rem;color:var(--muted);margin-bottom:.35rem;}
+  .breadcrumb a{color:var(--muted);}
+  .flex-between{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;}
+  .row{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
+  .muted{color:var(--muted);} .faint{color:var(--faint);}
+  .small{font-size:.82rem;} .tiny{font-size:.75rem;}
+
+  /* ===== Dots / pills ===== */
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  .dot.ok{background:var(--pos);} .dot.warn{background:var(--cau);} .dot.down{background:var(--neg);}
+  .dot.pulse{animation:pulse 1.5s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(199,22,43,.4);}50%{opacity:.5;box-shadow:0 0 0 5px rgba(199,22,43,0);}}
+  .pill{display:inline-flex;align-items:center;gap:.4rem;font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap;letter-spacing:.01em;}
+  .pill.ok{background:var(--pos-bg);color:var(--pos);} 
+  .pill.warn{background:var(--cau-bg);color:var(--cau-ink);}
+  .pill.down{background:var(--neg-bg);color:var(--neg);}
+  .pill.unknown{background:#eee;color:#555;}
+  .pill.info{background:var(--info-bg);color:var(--info);}
+
+  /* ===== Notifications ===== */
+  .note{border-radius:var(--r);padding:.85rem 1.1rem;margin:1rem 0;border-left:4px solid;display:flex;gap:.85rem;align-items:flex-start;background:var(--panel);box-shadow:var(--sh);}
+  .note .n-ico{font-weight:700;font-size:1.05rem;line-height:1.3;}
+  .note.neg{border-color:var(--neg);} .note.neg .n-ico{color:var(--neg);}
+  .note.cau{border-color:var(--cau);} .note.cau .n-ico{color:var(--cau-ink);}
+  .note.pos{border-color:var(--pos);} .note.pos .n-ico{color:var(--pos);}
+  .note.info{border-color:var(--info);} .note.info .n-ico{color:var(--info);}
+  .note .n-title{font-weight:600;margin-bottom:.1rem;}
+  .note .n-body{flex:1;}
+
+  /* ===== Buttons ===== */
+  .btn{font:inherit;font-size:.85rem;border-radius:var(--r);cursor:pointer;padding:.45rem .95rem;border:1px solid var(--line-2);background:#fff;color:var(--text);transition:background .12s,border-color .12s;display:inline-flex;align-items:center;gap:.4rem;}
+  .btn:hover{background:#f0f0f0;}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#fff;}
+  .btn.primary:hover{background:var(--orange-d);}
+  .btn.pos{background:var(--pos);border-color:var(--pos);color:#fff;} .btn.pos:hover{background:#0b6b1a;}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--link);padding:.3rem .4rem;}
+  .btn.sm{font-size:.78rem;padding:.3rem .65rem;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem;}
+
+  /* ===== Cards / summary ===== */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh);}
+  .summary{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:0;overflow:hidden;margin:1rem 0 .5rem;}
+  .summary .cell{padding:1.1rem 1.25rem;border-right:1px solid var(--line);}
+  .summary .cell:last-child{border-right:none;}
+  .summary .big{font-size:1.7rem;font-weight:300;line-height:1.1;}
+  .summary .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-top:.2rem;}
+  .summary .overall{display:flex;align-items:center;gap:.8rem;}
+  .summary .overall .big{font-size:1.35rem;font-weight:400;}
+
+  /* ===== Service list ===== */
+  .svc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);margin-bottom:.7rem;box-shadow:var(--sh);overflow:hidden;transition:border-color .12s;}
+  .svc.is-down{border-color:#f0b3ba;}
+  .svc-head{display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;cursor:pointer;}
+  .svc-head:hover{background:var(--panel-2);}
+  .svc-ico{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:1.05rem;background:#f0f0f0;flex-shrink:0;}
+  .svc.is-down .svc-ico{background:var(--neg-bg);}
+  .svc-name{font-weight:500;font-size:.98rem;display:flex;align-items:center;gap:.5rem;}
+  .svc-desc{color:var(--muted);font-size:.82rem;}
+  .svc-right{margin-left:auto;display:flex;align-items:center;gap:1.25rem;}
+  .uptime{display:flex;align-items:flex-end;gap:2px;height:26px;}
+  .uptime .bar{width:4px;border-radius:1px;background:var(--pos);}
+  .uptime .bar.warn{background:var(--cau);} .uptime .bar.down{background:var(--neg);}
+  .svc-meta{text-align:right;min-width:118px;}
+  .svc-meta .lat{color:var(--faint);font-size:.75rem;margin-top:.2rem;}
+  .chev{color:#aaa;transition:transform .15s;font-size:1.1rem;}
+  .svc.open .chev{transform:rotate(90deg);}
+  .svc-body{display:none;padding:.25rem 1.25rem 1.35rem 4.35rem;border-top:1px solid var(--line);}
+  .svc.open .svc-body{display:block;}
+
+  .kv{display:grid;grid-template-columns:170px 1fr;gap:.35rem 1rem;font-size:.86rem;margin:.75rem 0;}
+  .kv dt{color:var(--muted);} .kv dd{margin:0;}
+
+  .impact-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin:.5rem 0;}
+  .impact{display:flex;gap:.55rem;align-items:flex-start;font-size:.85rem;padding:.55rem .65rem;border-radius:var(--r);border:1px solid var(--line);}
+  .impact .i-ico{font-weight:700;line-height:1.2;}
+  .impact.blocked{background:var(--neg-bg);border-color:#f0c4c9;} .impact.blocked .i-ico{color:var(--neg);}
+  .impact.ok{background:var(--pos-bg);border-color:#cfe6c8;} .impact.ok .i-ico{color:var(--pos);}
+  .impact.warn{background:var(--cau-bg);border-color:#f2ddb0;} .impact.warn .i-ico{color:var(--cau-ink);}
+
+  .fix{display:flex;gap:.8rem;padding:.7rem 0;border-bottom:1px dashed var(--line);}
+  .fix:last-child{border-bottom:none;}
+  .fix .num{width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:.78rem;font-weight:600;flex-shrink:0;}
+  .fix .fix-title{font-weight:500;}
+  .fix .fix-desc{color:var(--muted);font-size:.84rem;}
+
+  details.admin{margin-top:.75rem;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);}
+  details.admin>summary{cursor:pointer;padding:.65rem .85rem;font-weight:500;font-size:.88rem;list-style:none;display:flex;align-items:center;gap:.5rem;}
+  details.admin>summary::-webkit-details-marker{display:none;}
+  details.admin>summary::before{content:"▸";color:#999;}
+  details.admin[open]>summary::before{content:"▾";}
+  details.admin[open]>summary{border-bottom:1px solid var(--line);}
+  .admin-body{padding:.6rem 1rem .9rem;}
+  ol.steps{margin:.4rem 0;padding-left:1.3rem;} ol.steps li{margin:.6rem 0;font-size:.86rem;}
+  pre.term{background:#1e1e1e;color:#e6e6e6;padding:.7rem .9rem;border-radius:var(--r);overflow-x:auto;font-family:"Ubuntu Mono",Consolas,monospace;font-size:.8rem;margin:.4rem 0;line-height:1.55;}
+  pre.term .cmt{color:#7fb37f;} pre.term .err{color:#ff8080;} pre.term .ok{color:#7fd17f;}
+
+  /* ===== Timeline ===== */
+  .timeline{border-left:2px solid var(--line);margin:.5rem 0 .5rem .5rem;padding-left:1.1rem;}
+  .tl-item{position:relative;padding:.4rem 0 .9rem;}
+  .tl-item::before{content:"";position:absolute;left:-1.5rem;top:.65rem;width:11px;height:11px;border-radius:50%;background:#fff;border:2px solid var(--line-2);}
+  .tl-item.neg::before{border-color:var(--neg);background:var(--neg);}
+  .tl-item.cau::before{border-color:var(--cau);background:var(--cau);}
+  .tl-item.pos::before{border-color:var(--pos);background:var(--pos);}
+  .tl-time{font-size:.74rem;color:var(--faint);text-transform:uppercase;letter-spacing:.03em;}
+  .tl-title{font-weight:500;font-size:.9rem;}
+  .tl-body{font-size:.85rem;color:var(--muted);}
+
+  /* ===== Credentials table ===== */
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh);}
+  th,td{text-align:left;padding:.7rem .9rem;border-bottom:1px solid var(--line);font-size:.88rem;}
+  th{background:var(--panel-2);font-weight:500;color:#555;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;}
+  tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:var(--panel-2);}
+
+  /* ===== State switcher (demo control) ===== */
+  .demo-bar{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:30;background:#1e1e1e;color:#eee;border-radius:26px;padding:.4rem .5rem;display:flex;align-items:center;gap:.4rem;box-shadow:var(--sh-lg);font-size:.8rem;}
+  .demo-bar .lbl{padding:0 .5rem;color:#9a9a9a;}
+  .demo-bar button{border:none;background:transparent;color:#ccc;padding:.35rem .8rem;border-radius:20px;cursor:pointer;font:inherit;font-size:.8rem;}
+  .demo-bar button:hover{background:#333;}
+  .demo-bar button.active{background:var(--orange);color:#fff;}
+
+  /* ===== Side panel ===== */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;z-index:20;}
+  .overlay.open{display:block;}
+  .side{position:fixed;top:0;right:0;height:100%;width:480px;max-width:94vw;background:#fff;box-shadow:var(--sh-lg);transform:translateX(100%);transition:transform .22s ease;z-index:21;display:flex;flex-direction:column;}
+  .side.open{transform:translateX(0);}
+  .side header{padding:1.1rem 1.35rem;border-bottom:1px solid var(--line);display:flex;align-items:center;}
+  .side header h3{margin:0;text-transform:none;color:var(--text);font-size:1.05rem;}
+  .side .sp-body{padding:1.15rem 1.35rem;overflow-y:auto;}
+
+  /* ===== Credential management ===== */
+  .toolbar{display:flex;align-items:center;gap:.6rem;margin:1rem 0;flex-wrap:wrap;}
+  .toolbar .search{flex:1;min-width:220px;}
+  .input{font:inherit;font-size:.86rem;padding:.5rem .7rem;border:1px solid var(--line-2);border-radius:var(--r);background:#fff;width:100%;color:var(--text);}
+  .input:focus{outline:2px solid rgba(233,84,32,.35);border-color:var(--orange);}
+  .filter{font:inherit;font-size:.83rem;padding:.5rem .7rem;border:1px solid var(--line-2);border-radius:var(--r);background:#fff;color:#555;cursor:pointer;white-space:nowrap;}
+  .filter:hover{background:#f2f2f2;}
+  .sortby{margin-left:auto;font-size:.82rem;color:var(--muted);display:flex;align-items:center;gap:.45rem;}
+  .table-foot{display:flex;justify-content:space-between;color:var(--faint);font-size:.8rem;margin-top:.55rem;}
+
+  .st{display:inline-flex;align-items:center;gap:.45rem;font-size:.84rem;white-space:nowrap;}
+  .st .ring{width:12px;height:12px;border-radius:50%;border:2px solid #bbb;display:inline-block;flex-shrink:0;}
+  .st.ok{color:var(--pos);} .st.ok .ring{border-color:var(--pos);}
+  .st.err{color:var(--neg);} .st.err .ring{border-color:var(--neg);background:var(--neg);}
+  .st.warn{color:var(--cau-ink);} .st.warn .ring{border-color:var(--cau);}
+  .st.idle{color:#888;} .st.idle .ring{border-color:#aaa;}
+  .st.unknown{color:#777;} .st.unknown .ring{border-color:#bbb;border-style:dashed;}
+
+  .cbadge{display:inline-flex;align-items:center;gap:.5rem;}
+  .cbadge .sq{width:22px;height:22px;border-radius:4px;background:#eef1f4;display:grid;place-items:center;font-size:.6rem;font-weight:700;color:#4a5a6a;text-transform:uppercase;flex-shrink:0;}
+
+  .act-cell{position:relative;text-align:right;white-space:nowrap;}
+  .kebab{border:1px solid var(--line-2);background:#fff;border-radius:var(--r);width:30px;height:28px;cursor:pointer;line-height:1;color:#555;font-size:1rem;}
+  .kebab:hover{background:#f0f0f0;}
+  .menu{position:absolute;right:0;top:32px;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:var(--sh-lg);min-width:168px;z-index:12;overflow:hidden;display:none;}
+  .menu.open{display:block;}
+  .menu button{display:block;width:100%;text-align:left;padding:.55rem .85rem;border:none;background:#fff;font:inherit;font-size:.85rem;cursor:pointer;color:var(--text);}
+  .menu button:hover{background:var(--panel-2);}
+  .menu button.danger{color:var(--neg);}
+  .menu .sep{height:1px;background:var(--line);}
+
+  .cred-head{display:flex;align-items:center;gap:.7rem;}
+  .cred-head .sq{width:36px;height:36px;border-radius:6px;background:#eef1f4;display:grid;place-items:center;font-weight:700;font-size:.72rem;color:#4a5a6a;text-transform:uppercase;}
+  .detail-card{border:1px solid var(--line);border-radius:var(--r-lg);padding:1.25rem 1.4rem;background:#fff;box-shadow:var(--sh);max-width:680px;margin:1rem 0 1.5rem;}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem 2.5rem;}
+  .detail-grid .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-bottom:.2rem;}
+  .detail-grid .v{font-size:.9rem;}
+  .masked{font-family:"Ubuntu Mono",Consolas,monospace;letter-spacing:.02em;}
+
+  /* form fields inside slide-over */
+  .form-group{margin-bottom:1.1rem;}
+  .form-group label{display:block;font-size:.82rem;font-weight:500;margin-bottom:.35rem;color:#444;}
+  .form-group .req{color:var(--neg);}
+  select.input{appearance:auto;cursor:pointer;}
+  .side .sp-foot{margin-top:auto;padding:1rem 1.35rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:.5rem;background:#fff;}
+
+  /* modal */
+  .modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:25;align-items:flex-start;justify-content:center;padding-top:7vh;}
+  .modal-wrap.open{display:flex;}
+  .modal{background:#fff;border-radius:var(--r-lg);box-shadow:var(--sh-lg);width:600px;max-width:94vw;max-height:86vh;display:flex;flex-direction:column;}
+  .modal header{padding:1rem 1.35rem;border-bottom:1px solid var(--line);display:flex;align-items:center;}
+  .modal header h3{margin:0;text-transform:none;color:var(--text);font-size:1.02rem;}
+  .modal .m-body{padding:1.1rem 1.35rem;overflow-y:auto;}
+  .modal .m-foot{padding:.85rem 1.35rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:.5rem;}
+  .btn.danger{border-color:var(--neg);color:var(--neg);background:#fff;}
+  .btn.danger:hover{background:var(--neg-bg);}
+  .reassign{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:.5rem .7rem;margin:.5rem 0;}
+  .reassign .m-name{font-size:.86rem;font-weight:500;}
+  .reassign .arrow{color:var(--faint);}
+  .reassign .old{font-size:.82rem;color:var(--muted);border:1px solid var(--line);border-radius:var(--r);padding:.35rem .55rem;background:var(--panel-2);}
+
+  .view{display:none;} .view.active{display:block;animation:fade .2s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+  .hidden{display:none!important;}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="logo"><strong>juju</strong> <span class="tag">JAAS</span></div>
+  <div class="spacer"></div>
+  <div class="health-chip" id="globalHealth"><span class="dot down pulse"></span> 1 service degraded</div>
+  <div class="user"><span>alex@canonical</span><div class="avatar">A</div></div>
+</div>
+
+<div class="app">
+  <nav class="primary">
+    <button class="navlink" onclick="show('models')"><span class="ico">▤</span> Models</button>
+    <button class="navlink" onclick="show('controllers')"><span class="ico">▦</span> Controllers</button>
+    <button class="navlink active" id="nav-credentials" onclick="show('credentials')"><span class="ico">🔑</span> Credentials</button>
+    <button class="navlink" onclick="show('permissions')"><span class="ico">👥</span> Permissions</button>
+    <button class="navlink" onclick="show('logs')"><span class="ico">≣</span> Logs</button>
+    <div class="section-label">System</div>
+    <button class="navlink" id="nav-status" onclick="show('status')">
+      <span class="ico">◇</span> Service status
+      <span class="badge pill down" id="navBadge">1 issue</span>
+    </button>
+  </nav>
+
+  <main>
+    <!-- ==================== CREDENTIALS ==================== -->
+    <section class="view active" id="view-credentials">
+      <div class="flex-between" style="align-items:center">
+        <div><h1>Credentials</h1>
+          <p class="subtitle">Cloud credentials you can access on this JAAS controller.</p></div>
+        <button class="btn primary" id="addCredBtn" onclick="openAddCred('add')">+ Add credential</button>
+      </div>
+
+      <div class="note neg" id="credBanner">
+        <span class="n-ico">✕</span>
+        <div class="n-body">
+          <div class="n-title">Secret storage isn’t reachable right now — some credential actions are disabled</div>
+          <div>We can’t read or change credential secrets right now because the secret store (Vault) isn’t reachable from this controller.
+            Existing models keep running on the copies already held by their controllers.</div>
+          <div class="btn-row">
+            <button class="btn sm" onclick="show('status')">View service status →</button>
+            <button class="btn ghost sm" onclick="recheck()">↻ Re-check now</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="note info hidden" id="credBannerOk">
+        <span class="n-ico">✓</span>
+        <div class="n-body"><div class="n-title">All credential services are operational</div>
+          <div>Secret storage, metadata and authorization checks are healthy.</div></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search"><input class="input" placeholder="Search credentials…" oninput="filterCreds(this.value)"></div>
+        <button class="filter">Filter cloud ▾</button>
+        <button class="filter">Filter owner ▾</button>
+        <button class="filter">Filter status ▾</button>
+        <span class="sortby">Sort by <button class="filter">Cloud ▾</button></span>
+      </div>
+
+      <table>
+        <thead><tr>
+          <th style="width:120px">Status</th><th>Name</th><th>Cloud</th><th>Region</th>
+          <th>Auth type</th><th>Owner</th><th style="width:80px">Models</th><th style="width:80px;text-align:right">Actions</th>
+        </tr></thead>
+        <tbody id="credRows"></tbody>
+      </table>
+      <div class="table-foot"><span id="credCount">Showing 5 of 5 credentials</span><span>Page 1 of 1</span></div>
+      <p class="tiny faint" style="margin-top:.5rem">When secret storage is unreachable, Status reads <em>Unknown</em> (never a false “valid”) — the dashboard doesn’t claim certainty it lacks.</p>
+    </section>
+
+    <!-- ==================== CREDENTIAL DETAIL ==================== -->
+    <section class="view" id="view-credential-detail">
+      <div class="breadcrumb"><a onclick="show('credentials')">Credentials</a> / <span id="cdCrumb">aws-prod-key</span></div>
+      <div class="flex-between" style="align-items:center">
+        <div class="cred-head">
+          <div class="sq" id="cdSq">AW</div>
+          <h1 id="cdTitle" style="margin:0">aws-prod-key</h1>
+          <span id="cdStatus"></span>
+        </div>
+        <div class="btn-row" style="margin:0">
+          <button class="btn" onclick="openAddCred('edit')">Edit</button>
+          <button class="btn danger" onclick="openRemoveCred(currentCred)">Delete</button>
+        </div>
+      </div>
+      <div class="detail-card" id="cdCard"></div>
+      <h2 style="margin-top:0">Used by <span id="cdUsedCount">4</span> models</h2>
+      <table>
+        <thead><tr><th>Model</th><th>Controller</th><th>Status</th><th style="text-align:right">Action</th></tr></thead>
+        <tbody id="cdModels"></tbody>
+      </table>
+      <p class="tiny faint" style="margin-top:.75rem">Each model runs on the credential set here. Reassign a model to a different credential before deleting this one.</p>
+    </section>
+
+    <!-- ==================== SERVICE STATUS ==================== -->
+    <section class="view" id="view-status">
+      <div class="breadcrumb"><a onclick="show('credentials')">Credentials</a> / Service status</div>
+      <div class="flex-between">
+        <div><h1>JIMM service status</h1>
+          <p class="subtitle">Health of the components that back credential management on this JAAS controller.</p></div>
+        <div style="text-align:right">
+          <button class="btn" onclick="recheck()">↻ Re-run health check</button>
+          <div class="tiny faint" id="checkedAt" style="margin-top:.4rem">Last checked just now · auto-refresh 30s</div>
+        </div>
+      </div>
+
+      <div class="panel summary" id="summaryStrip"></div>
+      <div id="incidentBanner"></div>
+
+      <h2 style="margin-top:1.5rem">Components</h2>
+      <div id="svcList"></div>
+
+      <h2>Incident history</h2>
+      <div class="panel" style="padding:1.1rem 1.35rem" id="incidentHistory"></div>
+
+      <p class="tiny faint" style="margin-top:1rem">Mock — statuses, endpoints and timings are illustrative. Use the switcher at the bottom to demo healthy / degraded / outage states.</p>
+    </section>
+
+    <section class="view" id="view-models"><h1>Models</h1><p class="subtitle">(Out of scope for this mock.)</p></section>
+    <section class="view" id="view-controllers"><h1>Controllers</h1><p class="subtitle">(Out of scope for this mock.)</p></section>
+    <section class="view" id="view-permissions"><h1>Permissions</h1><p class="subtitle">(Out of scope for this mock.)</p></section>
+    <section class="view" id="view-logs"><h1>Logs</h1><p class="subtitle">(Out of scope for this mock.)</p></section>
+  </main>
+</div>
+
+<!-- Debug side panel -->
+<div class="overlay" id="overlay" onclick="closeAllPanels()"></div>
+<aside class="side" id="panel">
+  <header><h3>Vault — raw check details</h3><button class="btn ghost" style="margin-left:auto" onclick="closePanel()">✕ Close</button></header>
+  <div class="sp-body">
+    <p class="muted small">The raw observation from the last health probe — what <em>this controller</em> saw, not a diagnosis. A failed probe only means “no healthy response reached us in time”; it can’t on its own tell a down Vault apart from a broken network route, DNS, or a slow reply.</p>
+    <dl class="kv">
+      <dt>Check type</dt><dd>TCP + <span class="mono">GET /v1/sys/health</span></dd>
+      <dt>Observed from</dt><dd class="mono">jimm-controller-3 (10.0.4.31)</dd>
+      <dt>Target</dt><dd class="mono">https://vault.internal:8200</dd>
+      <dt>Resolved IP</dt><dd class="mono">10.0.4.12</dd>
+      <dt>Attempts</dt><dd>3 (exponential backoff)</dd>
+      <dt>Started</dt><dd>2026-07-09 14:12:03 UTC</dd>
+    </dl>
+    <pre class="term"><span class="cmt"># probe output</span>
+GET https://vault.internal:8200/v1/sys/health
+<span class="err">dial tcp 10.0.4.12:8200: i/o timeout</span>
+retry 1 … <span class="err">i/o timeout</span>
+retry 2 … <span class="err">i/o timeout</span>
+retry 3 … <span class="err">connection refused</span>
+
+result: <span class="err">NO HEALTHY RESPONSE</span> (from jimm-controller-3)
+consecutive failures: 12
+first failure: 2026-07-09 14:12:03 UTC</pre>
+    <p class="muted small">Correlation ID <span class="mono">chk-9f2a1c</span> — include this when contacting support.</p>
+    <div class="btn-row"><button class="btn" onclick="recheck()">↻ Re-run this probe</button></div>
+  </div>
+</aside>
+
+<!-- Add / edit credential slide-over -->
+<aside class="side" id="addCredPanel">
+  <header><h3 id="addCredTitle">Add credential</h3><button class="btn ghost" style="margin-left:auto" onclick="closeAddCred()">✕ Close</button></header>
+  <div class="sp-body">
+    <div class="form-group"><label>Credential name <span class="req">*</span></label>
+      <input class="input" id="acName" placeholder="e.g. aws-prod-key"></div>
+    <div class="form-group"><label>Cloud <span class="req">*</span></label>
+      <select class="input" id="acCloud">
+        <option value="">Select cloud</option>
+        <option>AWS</option><option>Azure</option><option>Google Cloud</option><option>MAAS</option><option>OpenStack</option>
+      </select></div>
+    <div class="form-group"><label>Region <span class="faint" style="font-weight:400">(optional)</span></label>
+      <select class="input" id="acRegion">
+        <option value="">Select region</option>
+        <option>us-east-1</option><option>us-west-2</option><option>eu-west-1</option><option>RegionOne</option>
+      </select></div>
+    <div class="form-group"><label>Auth type <span class="req">*</span></label>
+      <select class="input" id="acAuth" onchange="renderAuthFields()">
+        <option value="">Select auth type</option>
+        <option value="access-key">Access key</option>
+        <option value="service-principal">Service principal</option>
+        <option value="service-account">Service account</option>
+        <option value="userpass">User / password</option>
+      </select></div>
+    <div id="acSecretFields"></div>
+    <p class="tiny faint">Secret values are written to Vault; JIMM stores only the name, cloud, region and owner — never the secret itself.</p>
+  </div>
+  <div class="sp-foot">
+    <button class="btn" onclick="closeAddCred()">Cancel</button>
+    <button class="btn primary" id="acSubmit" onclick="submitAddCred()">Add credential</button>
+  </div>
+</aside>
+
+<!-- Remove credential modal -->
+<div class="modal-wrap" id="removeModal">
+  <div class="modal">
+    <header><h3 id="rmTitle">Remove credential</h3><button class="btn ghost" style="margin-left:auto" onclick="closeRemoveCred()">✕</button></header>
+    <div class="m-body">
+      <p id="rmIntro" style="margin-top:0"></p>
+      <p class="muted small">To remove this credential you must first set a different credential for these models.</p>
+      <label class="row small" style="margin:.7rem 0"><input type="checkbox" id="rmAll" onchange="toggleRmAll()">&nbsp;Use one credential for all models</label>
+      <div id="rmRows"></div>
+      <button class="btn sm" style="margin-top:.5rem" onclick="rmSetNew()">Set new credential</button>
+    </div>
+    <div class="m-foot">
+      <button class="btn" onclick="closeRemoveCred()">Cancel</button>
+      <button class="btn danger" id="rmConfirm" disabled title="Reassign the models above first" onclick="closeRemoveCred()">Remove credential</button>
+    </div>
+  </div>
+</div>
+
+<!-- Demo state switcher -->
+
+<div class="demo-bar">
+  <span class="lbl">Demo state</span>
+  <button onclick="setState('healthy',this)">All healthy</button>
+  <button onclick="setState('degraded',this)">Degraded</button>
+  <button class="active" onclick="setState('outage',this)">Vault outage</button>
+</div>
+
+<script>
+  const ICON = {jimm:"◈",identity:"⿴",authz:"🛡",db:"🗄",vault:"🔒",ctrl:"▦"};
+  function hist(pattern){
+    return Array.from({length:60},(_,i)=>{
+      if(pattern==="down" && i>=54) return "down";
+      if(pattern==="warn" && (i===40||i===41||i>=57)) return i>=57?"down":"warn";
+      if(pattern==="blip" && i===33) return "warn";
+      return "ok";
+    });
+  }
+  const BASE = [
+    {id:"jimm",name:"JIMM controller & API",desc:"Core control plane and dashboard API",endpoint:"https://jimm.jaas.ai:443",lat:"42 ms"},
+    {id:"identity",name:"Identity (SSO / OIDC)",desc:"Login and user identity provider",endpoint:"login.ubuntu.com",lat:"88 ms"},
+    {id:"authz",name:"Authorization (OpenFGA)",desc:"ReBAC permission checks",endpoint:"openfga.internal:8080",lat:"15 ms"},
+    {id:"db",name:"Metadata database (PostgreSQL)",desc:"Credential names, owners, model links",endpoint:"postgres.internal:5432",lat:"6 ms"},
+    {id:"vault",name:"Secret storage (Vault)",desc:"Stores credential secret values (keys, passwords, tokens)",endpoint:"https://vault.internal:8200",lat:"—"},
+  ];
+  const STATES = {
+    outage:  {vault:"down"},
+    degraded:{vault:"warn"},
+    healthy: {vault:"ok"},
+  };
+  let current = "outage";
+  function statusOf(svcId,state){ return svcId==="vault" ? STATES[state].vault : "ok"; }
+  const META = {
+    ok:  {pill:"ok",  label:"Operational", dot:"ok"},
+    warn:{pill:"warn",label:"Degraded",    dot:"warn"},
+    down:{pill:"down",label:"Unreachable", dot:"down"},
+  };
+
+  const CREDS = [
+    {name:"aws-prod-key",cloud:"AWS",code:"AW",region:"us-east-1",auth:"access-key",authLabel:"Access Key",owner:"me@canonical.com",models:4,status:"ok",added:"10 June 2026",secretLabel:"Access Key ID",secretMasked:"AKIA••••••••MPLE",
+      usedBy:[{model:"production-web",controller:"JAAS",status:"Running"},{model:"staging-api",controller:"JAAS",status:"Running"},{model:"dev-testing",controller:"JAAS",status:"Blocked"},{model:"analytics-prod",controller:"JAAS",status:"Running"}]},
+    {name:"azure-staging",cloud:"Azure",code:"AZ",region:"westeurope",auth:"service-principal",authLabel:"Service Principal",owner:"me@canonical.com",models:1,status:"ok",added:"2 May 2026",secretLabel:"Application ID",secretMasked:"a1b2••••••••c3d4",
+      usedBy:[{model:"staging-web",controller:"JAAS",status:"Running"}]},
+    {name:"gcp-data-warehouse",cloud:"Google Cloud",code:"GC",region:"us-central1",auth:"service-account",authLabel:"Service Account",owner:"team-data@canonical.com",models:2,status:"err",added:"18 April 2026",secretLabel:"Service account",secretMasked:"data-sa@project.iam",
+      usedBy:[{model:"warehouse-etl",controller:"JAAS",status:"Blocked"},{model:"bi-dashboards",controller:"JAAS",status:"Running"}]},
+    {name:"maas-lab",cloud:"MAAS",code:"MA",region:"",auth:"userpass",authLabel:"API Key",owner:"me@canonical.com",models:0,status:"idle",added:"3 March 2026",secretLabel:"API key",secretMasked:"••••••••••••",
+      usedBy:[]},
+    {name:"openstack-bootstack",cloud:"OpenStack",code:"OS",region:"RegionOne",auth:"userpass",authLabel:"User Password",owner:"admin@canonical.com",models:5,status:"warn",added:"21 February 2026",secretLabel:"Username",secretMasked:"svc-bootstack",
+      usedBy:[{model:"infra-core",controller:"JAAS",status:"Running"},{model:"infra-edge",controller:"JAAS",status:"Running"},{model:"monitoring",controller:"JAAS",status:"Running"},{model:"backups",controller:"JAAS",status:"Running"},{model:"lab-sandbox",controller:"JAAS",status:"Idle"}]},
+  ];
+  let currentCred = null;
+
+  function credStatus(c){
+    if(statusOf("vault",current)==="down") return {cls:"unknown",label:"Unknown"};
+    return ({ok:{cls:"ok",label:"OK"},err:{cls:"err",label:"Error"},warn:{cls:"warn",label:"Warn"},idle:{cls:"idle",label:"Idle"}})[c.status];
+  }
+  function statusChip(s){
+    const t = s.cls==="unknown" ? ` title="Can’t verify — secret store is unreachable from here"` : "";
+    return `<span class="st ${s.cls}"${t}><span class="ring"></span>${s.label}</span>`;
+  }
+  function modelStatChip(st){
+    const cls = st==="Running"?"ok":st==="Blocked"?"err":"idle";
+    return `<span class="st ${cls}"><span class="ring"></span>${st}</span>`;
+  }
+
+  function renderCreds(){
+    const vault = statusOf("vault",current);
+    document.getElementById("credRows").innerHTML = CREDS.map((c,i)=>{
+      const s=credStatus(c);
+      return `<tr>
+        <td>${statusChip(s)}</td>
+        <td><a onclick="showCredDetail('${c.name}')">${c.name}</a></td>
+        <td><span class="cbadge"><span class="sq">${c.code}</span>${c.cloud}</span></td>
+        <td class="small">${c.region||'—'}</td>
+        <td class="small">${c.authLabel}</td>
+        <td class="small">${c.owner}</td>
+        <td>${c.models}</td>
+        <td class="act-cell">
+          <button class="kebab" onclick="toggleMenu(event,${i})" aria-label="Actions">⋮</button>
+          <div class="menu" id="menu-${i}">
+            <button onclick="showCredDetail('${c.name}')">View details</button>
+            <button onclick="openAddCred('edit','${c.name}')">Edit credential</button>
+            <div class="sep"></div>
+            <button class="danger" onclick="openRemoveCred('${c.name}')">Delete credential</button>
+          </div>
+        </td></tr>`;
+    }).join("");
+    document.getElementById("credCount").textContent = `Showing ${CREDS.length} of ${CREDS.length} credentials`;
+
+    const down = vault==="down";
+    document.getElementById("credBannerOk").classList.toggle("hidden", vault!=="ok");
+    const addBtn=document.getElementById("addCredBtn");
+    addBtn.disabled = down;
+    addBtn.title = down ? "Adding credentials is unavailable while secret storage is unreachable" : "";
+
+    const b=document.getElementById("credBanner");
+    if(vault==="ok"){ b.classList.add("hidden"); }
+    else if(vault==="warn"){
+      b.classList.remove("hidden","neg"); b.classList.add("cau");
+      b.querySelector(".n-title").textContent="Secret storage is degraded — actions are slower than usual";
+      b.querySelector(".n-ico").textContent="!";
+    } else {
+      b.classList.remove("hidden","cau"); b.classList.add("neg");
+      b.querySelector(".n-title").textContent="Secret storage isn’t reachable right now — some credential actions are disabled";
+      b.querySelector(".n-ico").textContent="✕";
+    }
+    // keep an open detail view in sync with the demo state
+    if(currentCred && document.getElementById("view-credential-detail").classList.contains("active")) showCredDetail(currentCred,true);
+  }
+
+  function findCred(name){ return CREDS.find(c=>c.name===name); }
+  function filterCreds(q){
+    q=(q||"").toLowerCase();
+    const rows=document.querySelectorAll('#credRows tr');
+    let shown=0;
+    CREDS.forEach((c,i)=>{
+      const hit=(c.name+' '+c.cloud+' '+c.owner+' '+(c.region||'')+' '+c.authLabel).toLowerCase().includes(q);
+      if(rows[i]) rows[i].style.display=hit?'':'none';
+      if(hit) shown++;
+    });
+    document.getElementById('credCount').textContent=`Showing ${shown} of ${CREDS.length} credentials`;
+  }
+
+  function toggleMenu(e,i){
+    e.stopPropagation();
+    const m=document.getElementById('menu-'+i);
+    const open=m.classList.contains('open');
+    document.querySelectorAll('.menu').forEach(x=>x.classList.remove('open'));
+    if(!open) m.classList.add('open');
+  }
+  document.addEventListener('click',()=>document.querySelectorAll('.menu').forEach(x=>x.classList.remove('open')));
+
+  function showCredDetail(name,keepScroll){
+    const c=findCred(name); if(!c) return;
+    currentCred=name;
+    const vaultDown=statusOf("vault",current)==="down";
+    const s=credStatus(c);
+    document.getElementById('cdCrumb').textContent=c.name;
+    document.getElementById('cdTitle').textContent=c.name;
+    document.getElementById('cdSq').textContent=c.code;
+    document.getElementById('cdStatus').innerHTML=statusChip(s);
+    document.getElementById('cdUsedCount').textContent=c.usedBy.length;
+    document.getElementById('cdCard').innerHTML=`
+      <div class="detail-grid">
+        <div><div class="k">Cloud</div><div class="v"><span class="cbadge"><span class="sq">${c.code}</span>${c.cloud}</span></div></div>
+        <div><div class="k">Auth type</div><div class="v">${c.authLabel}</div></div>
+        <div><div class="k">Region</div><div class="v">${c.region||'—'}</div></div>
+        <div><div class="k">Owner</div><div class="v">${c.owner}</div></div>
+        <div><div class="k">Added</div><div class="v">${c.added}</div></div>
+        <div><div class="k">${c.secretLabel}</div><div class="v">${vaultDown?'<span class="muted small">Unavailable — secret store unreachable</span>':`<span class="masked">${c.secretMasked}</span> &nbsp;<a onclick="return false">Show</a>`}</div></div>
+        <div><div class="k">Status</div><div class="v">${statusChip(s)}</div></div>
+        <div><div class="k">Used by</div><div class="v">${c.usedBy.length} model${c.usedBy.length===1?'':'s'}</div></div>
+      </div>`;
+    document.getElementById('cdModels').innerHTML = c.usedBy.length
+      ? c.usedBy.map(m=>`<tr><td><a onclick="return false">${m.model}</a></td><td>${m.controller}</td><td>${modelStatChip(m.status)}</td>
+          <td style="text-align:right"><button class="btn sm" onclick="openRemoveCred('${c.name}')">Set new credential</button></td></tr>`).join("")
+      : `<tr><td colspan="4" class="muted small">Not used by any model.</td></tr>`;
+    if(!keepScroll) show('credential-detail');
+  }
+
+  /* ---- add / edit slide-over ---- */
+  function openAddCred(mode,name){
+    const isEdit = mode==='edit';
+    const c = isEdit ? findCred(name||currentCred) : null;
+    document.getElementById('addCredTitle').textContent = isEdit?'Edit credential':'Add credential';
+    document.getElementById('acSubmit').textContent = isEdit?'Save changes':'Add credential';
+    document.getElementById('acName').value = c?c.name:'';
+    document.getElementById('acCloud').value = c?c.cloud:'';
+    document.getElementById('acRegion').value = c?(c.region||''):'';
+    document.getElementById('acAuth').value = c?c.auth:'';
+    renderAuthFields();
+    document.querySelectorAll('.menu').forEach(x=>x.classList.remove('open'));
+    document.getElementById('addCredPanel').classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+  }
+  function closeAddCred(){ document.getElementById('addCredPanel').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+  function submitAddCred(){ closeAddCred(); }
+  function renderAuthFields(){
+    const t=document.getElementById('acAuth').value;
+    const map={
+      'access-key':[['Access key ID','AKIA…'],['Secret access key','••••••••']],
+      'service-principal':[['Application ID','app id…'],['Client secret','••••••••'],['Subscription ID','sub id…']],
+      'service-account':[['Service account JSON key','paste JSON…']],
+      'userpass':[['Username','username'],['Password','••••••••']],
+    };
+    document.getElementById('acSecretFields').innerHTML = (map[t]||[]).map(f=>
+      `<div class="form-group"><label>${f[0]} <span class="req">*</span></label><input class="input" placeholder="${f[1]}"></div>`).join("");
+  }
+
+  /* ---- remove / reassign modal ---- */
+  function openRemoveCred(name){
+    const c=findCred(name); if(!c) return;
+    currentCred=name;
+    document.querySelectorAll('.menu').forEach(x=>x.classList.remove('open'));
+    document.getElementById('rmTitle').textContent='Remove credential '+c.name;
+    const models=c.usedBy.map(m=>m.model);
+    document.getElementById('rmIntro').innerHTML = models.length
+      ? `This credential is used by <strong>${models.length} model${models.length===1?'':'s'}</strong>: ${models.join(', ')}`
+      : `This credential isn’t used by any model and can be removed directly.`;
+    renderRmRows(c,false);
+    document.getElementById('rmAll').checked=false;
+    const cf=document.getElementById('rmConfirm');
+    cf.disabled = models.length>0;
+    cf.title = models.length>0 ? 'Reassign the models above first' : '';
+    document.getElementById('removeModal').classList.add('open');
+  }
+  function renderRmRows(c,useAll){
+    const opts=`<option value="">Select credential</option>`+CREDS.filter(x=>x.name!==c.name && x.cloud===c.cloud).map(x=>`<option>${x.name}</option>`).join("");
+    document.getElementById('rmRows').innerHTML = c.usedBy.map((m,i)=>`
+      <div class="reassign">
+        <span class="m-name">${m.model}</span><span class="arrow">→</span>
+        ${ (useAll && i>0) ? '<span class="old" style="color:var(--pos)">↳ same as above</span>' : `<select class="input">${opts}</select>` }
+      </div>`).join("");
+  }
+  function toggleRmAll(){ const c=findCred(currentCred); if(c) renderRmRows(c, document.getElementById('rmAll').checked); }
+  function rmSetNew(){
+    document.getElementById('rmRows').querySelectorAll('select').forEach(s=>{ if(!s.value && s.options.length>1) s.selectedIndex=1; });
+    const cf=document.getElementById('rmConfirm'); cf.disabled=false; cf.title='';
+  }
+  function closeRemoveCred(){ document.getElementById('removeModal').classList.remove('open'); }
+
+  function renderSummary(){
+    const vault=statusOf("vault",current);
+    const down = BASE.filter(s=>statusOf(s.id,current)==="down").length;
+    const deg  = BASE.filter(s=>statusOf(s.id,current)==="warn").length;
+    const ok   = BASE.length-down-deg;
+    let overall = down?{t:"Service disruption",c:"down"}:deg?{t:"Partial degradation",c:"warn"}:{t:"All systems operational",c:"ok"};
+    document.getElementById("summaryStrip").innerHTML = `
+      <div class="cell"><div class="overall"><span class="dot ${META[overall.c].dot} ${overall.c!=="ok"?"pulse":""}"></span>
+        <div><div class="big">${overall.t}</div><div class="lbl">Overall status</div></div></div></div>
+      <div class="cell"><div class="big" style="color:var(--pos)">${ok}</div><div class="lbl">Operational</div></div>
+      <div class="cell"><div class="big" style="color:${deg?'var(--cau-ink)':'var(--faint)'}">${deg}</div><div class="lbl">Degraded</div></div>
+      <div class="cell"><div class="big" style="color:${down?'var(--neg)':'var(--faint)'}">${down}</div><div class="lbl">Unreachable</div></div>`;
+
+    const ib=document.getElementById("incidentBanner");
+    if(vault==="down"){
+      ib.innerHTML=`<div class="note neg"><span class="n-ico">✕</span><div class="n-body">
+        <div class="n-title">Active incident · Secret storage (Vault) unreachable</div>
+        <div>Started ~6 minutes ago — all 3 controllers report no healthy response from Vault. Credential create/update/delete is blocked; running models are unaffected.</div></div></div>`;
+    } else if(vault==="warn"){
+      ib.innerHTML=`<div class="note cau"><span class="n-ico">!</span><div class="n-body">
+        <div class="n-title">Active incident · Secret storage (Vault) degraded</div>
+        <div>Elevated latency and intermittent timeouts. Actions may be slow or need a retry.</div></div></div>`;
+    } else {
+      ib.innerHTML=`<div class="note pos"><span class="n-ico">✓</span><div class="n-body">
+        <div class="n-title">No active incidents</div><div>All credential-related services are responding normally.</div></div></div>`;
+    }
+  }
+
+  function uptimeBars(pattern){
+    return `<div class="uptime" title="Last 60 checks">`+
+      hist(pattern).map(v=>{const h=v==="down"?10:v==="warn"?16:(12+Math.round(Math.random()*12));
+        return `<span class="bar ${v}" style="height:${h}px"></span>`;}).join("")+`</div>`;
+  }
+  function vaultBody(st){
+    if(st==="ok"){
+      return `<dl class="kv"><dt>Endpoint</dt><dd class="mono">https://vault.internal:8200</dd>
+        <dt>Response</dt><dd>HTTP 200 · sealed=false · 24 ms</dd>
+        <dt>Last successful check</dt><dd>7 seconds ago</dd></dl>
+        <div class="impact-grid">
+          <div class="impact ok"><span class="i-ico">✓</span><div><strong>Add / update / remove credential</strong><br><span class="muted">Available.</span></div></div>
+          <div class="impact ok"><span class="i-ico">✓</span><div><strong>Read secret values</strong><br><span class="muted">Available.</span></div></div>
+        </div>`;
+    }
+    const isDown = st==="down";
+    return `
+      <dl class="kv">
+        <dt>Endpoint</dt><dd class="mono">https://vault.internal:8200</dd>
+        <dt>Observed from</dt><dd class="mono">${isDown?"3 of 3 controllers report no healthy response":"jimm-controller-3 (intermittent)"}</dd>
+        <dt>${isDown?"Unreachable since":"Degraded since"}</dt><dd>2026-07-09 14:12 UTC (~6 min)</dd>
+        <dt>Last error</dt><dd class="mono" style="color:var(--neg)">${isDown?"connection refused (dial tcp 10.0.4.12:8200: i/o timeout)":"intermittent i/o timeout (3 of last 10 checks)"}</dd>
+      </dl>
+      <p class="muted small">A single probe only proves “no healthy response reached that node in time” — it can’t alone tell a Vault outage apart from a broken route, DNS, or a slow reply. ${isDown?"This is reported as unreachable because <strong>all 3 controllers</strong> independently see the same failure; if only one did, we’d scope it to that node instead.":"Only one controller sees this, so it may be a local network/route issue rather than Vault itself."}</p>
+      <div class="btn-row">
+        <button class="btn sm" onclick="openPanel()">View raw check details</button>
+        <button class="btn sm" onclick="recheck()">↻ Re-test connection</button>
+      </div>
+      <h3>What this affects</h3>
+      <div class="impact-grid">
+        <div class="impact ${isDown?'blocked':'warn'}"><span class="i-ico">${isDown?'✕':'!'}</span><div><strong>Add / update / remove credential</strong><br><span class="muted">${isDown?'Blocked — secrets can’t be written or read.':'Slow / may need retry.'}</span></div></div>
+        <div class="impact ${isDown?'blocked':'warn'}"><span class="i-ico">${isDown?'✕':'!'}</span><div><strong>View credential secret values</strong><br><span class="muted">${isDown?'Unavailable until Vault is reachable again.':'Intermittent.'}</span></div></div>
+        <div class="impact ok"><span class="i-ico">✓</span><div><strong>Running models</strong><br><span class="muted">Unaffected — controllers use their local credential copy.</span></div></div>
+        <div class="impact warn"><span class="i-ico">!</span><div><strong>Add model / bootstrap needing a fresh credential</strong><br><span class="muted">May fail if it must read a secret now.</span></div></div>
+      </div>
+      <h3>Recommended actions</h3>
+      <div>
+        <div class="fix"><div class="num">1</div><div><div class="fix-title">Re-test the connection</div>
+          <div class="fix-desc">Outages are often transient. Re-run the check before escalating.</div>
+          <div class="btn-row"><button class="btn sm" onclick="recheck()">↻ Re-test now</button></div></div></div>
+        <div class="fix"><div class="num">2</div><div><div class="fix-title">Queue &amp; auto-retry your blocked action</div>
+          <div class="fix-desc">You were adding <span class="mono">prod-aws-key</span>. We can hold it and submit once Vault is healthy.</div>
+          <div class="btn-row"><button class="btn pos sm" onclick="this.textContent='✓ Queued — will auto-retry';this.disabled=true;this.classList.remove('pos')">Queue &amp; auto-retry</button></div></div></div>
+        <div class="fix"><div class="num">3</div><div><div class="fix-title">Notify your platform / ops team</div>
+          <div class="fix-desc">The team that operates this deployment owns Vault recovery. We can pre-fill the affected component, error and correlation ID.</div>
+          <div class="btn-row"><button class="btn sm" onclick="alert('Would notify the ops team with the incident details (mock)')">Notify ops team</button></div></div></div>
+        <div class="fix"><div class="num">4</div><div><div class="fix-title">Report to Canonical support</div>
+          <div class="fix-desc">If you have a support contract, raise a ticket through your Canonical support channel with the details attached.</div>
+          <div class="btn-row"><button class="btn sm" onclick="alert('Would open a pre-filled support ticket (mock)')">Report to support</button></div></div></div>
+      </div>
+      <details class="admin"><summary>Administrator / self-hosted troubleshooting</summary>
+        <div class="admin-body">
+          <p class="muted small">For operators who run their own Vault. Most Vault outages after a restart are a <strong>sealed</strong> Vault.</p>
+          <ol class="steps">
+            <li>Check whether Vault is sealed:
+              <pre class="term"><span class="cmt"># on the Vault unit</span>
+vault status
+<span class="err">Sealed          true</span></pre>
+              If sealed, unseal with the key shares:
+              <pre class="term">vault operator unseal &lt;key-share-1&gt;
+vault operator unseal &lt;key-share-2&gt;
+vault operator unseal &lt;key-share-3&gt;</pre></li>
+            <li>Confirm the Vault app/unit is up:
+              <pre class="term">juju status vault
+<span class="cmt"># or on k8s</span>
+kubectl -n vault get pods</pre></li>
+            <li>Verify JIMM → Vault connectivity &amp; that the AppRole token/lease hasn’t expired:
+              <pre class="term">juju debug-log --include jimm | grep -i vault</pre></li>
+            <li>Check network path / firewall to <span class="mono">10.0.4.12:8200</span>.</li>
+            <li>When <span class="mono">vault status</span> shows <span class="ok mono">Sealed false</span>, return and press <em>Re-run health check</em>.</li>
+          </ol>
+        </div>
+      </details>`;
+  }
+  function okBody(s){
+    return `<dl class="kv"><dt>Endpoint</dt><dd class="mono">${s.endpoint}</dd>
+      <dt>Response</dt><dd>HTTP 200 · ${s.lat}</dd>
+      <dt>Last successful check</dt><dd>${(Math.random()*9+2|0)} seconds ago</dd>
+      ${s.id==="db"?'<dt>Note</dt><dd>Credential <em>metadata</em> is readable here; only the <em>secret values</em> live in Vault.</dd>':''}</dl>`;
+  }
+  function renderServices(){
+    document.getElementById("svcList").innerHTML = BASE.map(s=>{
+      const st=statusOf(s.id,current); const m=META[st];
+      const pattern = s.id==="vault" ? (st==="down"?"down":st==="warn"?"warn":"blip") : "ok";
+      const isVault=s.id==="vault";
+      const open = isVault && st!=="ok";
+      return `<div class="svc ${st==="down"?"is-down":""} ${open?"open":""}">
+        <div class="svc-head" onclick="this.closest('.svc').classList.toggle('open')">
+          <div class="svc-ico">${ICON[s.id]}</div>
+          <div><div class="svc-name">${s.name} <span class="pill ${m.pill}">${m.label}</span></div>
+            <div class="svc-desc">${s.desc}</div></div>
+          <div class="svc-right">
+            ${uptimeBars(pattern)}
+            <div class="svc-meta"><span class="dot ${m.dot} ${st==="down"?"pulse":""}"></span> ${st==="ok"?s.lat:(st==="down"?"timeout":"elevated")}
+              <div class="lat">checked ${(Math.random()*9+2|0)}s ago</div></div>
+            <span class="chev">›</span>
+          </div>
+        </div>
+        <div class="svc-body">${isVault?vaultBody(st):okBody(s)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderHistory(){
+    const vault=statusOf("vault",current);
+    const active = vault==="down"
+      ? [{cls:"neg",time:"14:12 UTC · investigating",title:"Secret storage (Vault) unreachable",body:"No healthy response from Vault on any controller since 14:12. Credential writes blocked. Investigating whether Vault is down or the network path is broken."}]
+      : vault==="warn"
+      ? [{cls:"cau",time:"14:12 UTC · monitoring",title:"Secret storage (Vault) degraded",body:"Elevated latency and intermittent timeouts observed. Monitoring recovery."}]
+      : [{cls:"pos",time:"just now",title:"All services operational",body:"No incidents in the current window."}];
+    const past = [
+      {cls:"pos",time:"Jul 2 · resolved (32 min)",title:"Vault brief outage after upgrade",body:"Vault came up sealed following a charm upgrade; unsealed and restored."},
+      {cls:"pos",time:"Jun 18 · resolved (8 min)",title:"OpenFGA elevated latency",body:"Permission checks slowed during a database failover; auto-recovered."},
+    ];
+    document.getElementById("incidentHistory").innerHTML = `<div class="timeline">`+
+      active.concat(past).map(i=>`<div class="tl-item ${i.cls}">
+        <div class="tl-time">${i.time}</div><div class="tl-title">${i.title}</div>
+        <div class="tl-body">${i.body}</div></div>`).join("")+`</div>`;
+  }
+
+  function renderChrome(){
+    const down=BASE.filter(s=>statusOf(s.id,current)==="down").length;
+    const deg=BASE.filter(s=>statusOf(s.id,current)==="warn").length;
+    const gh=document.getElementById("globalHealth");
+    const badge=document.getElementById("navBadge");
+    if(down){ gh.innerHTML='<span class="dot down pulse"></span> '+down+' service'+(down>1?'s':'')+' unreachable';
+      badge.className="badge pill down"; badge.textContent=down+" issue"; badge.classList.remove("hidden"); }
+    else if(deg){ gh.innerHTML='<span class="dot warn pulse"></span> '+deg+' degraded';
+      badge.className="badge pill warn"; badge.textContent="degraded"; badge.classList.remove("hidden"); }
+    else { gh.innerHTML='<span class="dot ok"></span> All systems operational';
+      badge.classList.add("hidden"); }
+  }
+
+  function renderAll(){ renderChrome(); renderCreds(); renderSummary(); renderServices(); renderHistory(); }
+
+  function show(view){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+view).classList.add('active');
+    document.querySelectorAll('nav .navlink').forEach(n=>n.classList.remove('active'));
+    if(view==='status') document.getElementById('nav-status').classList.add('active');
+    else if(view==='credentials'||view==='credential-detail') document.getElementById('nav-credentials').classList.add('active');
+    else{ const map={models:0,controllers:1,permissions:3,logs:4}; document.querySelectorAll('nav .navlink')[map[view]??0].classList.add('active'); }
+    window.scrollTo(0,0);
+  }
+  function openPanel(){document.getElementById('panel').classList.add('open');document.getElementById('overlay').classList.add('open');}
+  function closePanel(){document.getElementById('panel').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
+  function closeAllPanels(){document.getElementById('panel').classList.remove('open');document.getElementById('addCredPanel').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
+  function recheck(){
+    const el=document.getElementById('checkedAt');
+    if(el){el.textContent='Checking…';setTimeout(()=>el.textContent='Last checked just now · auto-refresh 30s',800);}
+    const gh=document.getElementById('globalHealth');
+    gh.innerHTML='<span class="dot warn pulse"></span> Re-checking…';setTimeout(()=>renderChrome(),800);
+  }
+  function setState(state,btn){
+    current=state;
+    document.querySelectorAll('.demo-bar button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAll();
+  }
+
+  renderAll();
+</script>
+</body>
+</html>
